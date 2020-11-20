@@ -2,11 +2,10 @@ using System;
 using System.Collections;
 using System.Linq;
 using DotFeather;
-using OpenTK.Graphics.Vulkan;
 
-public class ReversiAI
+public class SimpleAi : IAi
 {
-    public ReversiAI(Reversi game)
+    public SimpleAi(Reversi game)
     {
         this.game = game;
     }
@@ -44,7 +43,7 @@ public class ReversiAI
                 minScore = score;
                 res = l;
             }
-            yield return new WaitForSeconds(0.1f);
+            yield return null;
         }
         Console.WriteLine("Finally I chose " + res);
 

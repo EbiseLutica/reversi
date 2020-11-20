@@ -2,12 +2,37 @@ using System.Collections.Generic;
 using System.Drawing;
 using DotFeather;
 
-public class ReversiScene : Scene
+public class GameScene : Scene
 {
+    public GameMode Mode { get; set; }
+
     public override void OnStart(Dictionary<string, object> args)
     {
         game = new Reversi();
-        ai = new ReversiAI(game);
+
+        if (args.ContainsKey("mode") && args["mode"] is string mode)
+        {
+            switch (mode)
+            {
+                case "Multiplayer":
+                    Mode = GameMode.MultiPlayer;
+                    break;
+                case "SimpleAI":
+                    ai = new SimpleAi(game);
+                    Mode = GameMode.VsCpu;
+                    break;
+                case "DynamicAI":
+                    Mode = GameMode.VsCpu;
+                    break;
+                case "RandomAI":
+                    ai = new RandomAi(game);
+                    Mode = GameMode.VsCpu;
+                    break;
+                default:
+                    break;
+
+            }
+        }
 
         boardView = new Container();
         boardView.Scale *= 2;
@@ -45,44 +70,20 @@ public class ReversiScene : Scene
     {
         boardView.Location = (DF.Window.Size.X / 2 - 128, 96);
 
+        if (!DF.Window.IsFocused) return;
+
+        if (DFKeyboard.Escape.IsKeyDown) DF.Router.ChangeScene<TitleScene>();
+
         if (game.IsGameSet)
         {
-            if (DFMouse.IsLeftDown && DF.Window.IsFocused)
+            if (DFMouse.IsLeftDown)
             {
-                DF.Router.ChangeScene<ReversiScene>();
+                DF.Router.ChangeScene<TitleScene>();
             }
         }
         else
         {
-            if (game.CurrentStone == Stone.White)
-            {
-                if (ai.HasResult && ai.Read() is VectorInt v)
-                {
-                    game.Place(v);
-                    aud.PlayOneShotAsync(sfxPlace2);
-                    Render();
-                }
-                else if (!ai.IsThinking)
-                {
-                    ai.Think();
-                }
-            }
-            else
-            {
-                if (DFMouse.IsLeftDown && DF.Window.IsFocused && HoveringPosition is VectorInt p)
-                {
-                    if (!game.IsPlaceable(p))
-                    {
-                        aud.PlayOneShotAsync(sfxError);
-                    }
-                    else
-                    {
-                        game.Place(p);
-                        aud.PlayOneShotAsync(sfxPlace1);
-                    }
-                    Render();
-                }
-            }
+            DoGame();
         }
     }
 
@@ -105,7 +106,7 @@ public class ReversiScene : Scene
         }
     }
 
-    public void Render()
+    private void Render()
     {
         // Render Board
         stones.Clear();
@@ -113,11 +114,19 @@ public class ReversiScene : Scene
         {
             for (var x = 0; x < 8; x++)
             {
+                var visiblePrompt = Mode switch
+                {
+                    GameMode.MultiPlayer => game.IsPlaceable((x, y)),
+                    GameMode.VsCpu => game.CurrentStone == Stone.Black && game.IsPlaceable((x, y)),
+                    GameMode.CpuVsCpu => false,
+                    _ => false,
+                };
+
                 stones[x, y] = game.Board[x, y] switch
                 {
                     Stone.Black => tileStoneBlack,
                     Stone.White => tileStoneWhite,
-                    _ => game.IsPlaceable((x, y)) ? tilePrompt : null,
+                    _ => visiblePrompt ? tilePrompt : null,
                 };
             }
         }
@@ -136,6 +145,62 @@ public class ReversiScene : Scene
         turn.Location = (DF.Window.Width / 2 - turn.Width / 2, score.Location.Y + 16);
     }
 
+    private void DoGame()
+    {
+        if (Mode == GameMode.VsCpu) DoVsCpu();
+        if (Mode == GameMode.MultiPlayer) DoMultiplayer();
+    }
+
+    private void DoVsCpu()
+    {
+        if (game.CurrentStone == Stone.White)
+        {
+            if (ai != null && ai.HasResult && ai.Read() is VectorInt v)
+            {
+                game.Place(v);
+                aud.PlayOneShotAsync(sfxPlace2);
+                Render();
+            }
+            else if (ai != null && !ai.IsThinking)
+            {
+                ai.Think();
+            }
+        }
+        else
+        {
+            if (DFMouse.IsLeftDown && HoveringPosition is VectorInt p)
+            {
+                if (!game.IsPlaceable(p))
+                {
+                    aud.PlayOneShotAsync(sfxError);
+                }
+                else
+                {
+                    game.Place(p);
+                    aud.PlayOneShotAsync(sfxPlace1);
+                }
+                Render();
+            }
+        }
+    }
+
+    private void DoMultiplayer()
+    {
+        if (DFMouse.IsLeftDown && HoveringPosition is VectorInt p)
+        {
+            if (!game.IsPlaceable(p))
+            {
+                aud.PlayOneShotAsync(sfxError);
+            }
+            else
+            {
+                aud.PlayOneShotAsync(game.CurrentStone == Stone.Black ? sfxPlace1 : sfxPlace2);
+                game.Place(p);
+            }
+            Render();
+        }
+    }
+
     private Container boardView;
     private Tilemap stones;
     private Tile tileStoneBlack;
@@ -145,7 +210,7 @@ public class ReversiScene : Scene
     private TextElement score;
 
     private Reversi game;
-    private ReversiAI ai;
+    private IAi ai;
 
     private readonly AudioPlayer aud = new AudioPlayer();
     private readonly IAudioSource sfxPlace1 = new WaveAudioSource("resources/sounds/sfx_place1.wav");

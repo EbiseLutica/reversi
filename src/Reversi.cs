@@ -23,10 +23,10 @@ public class Reversi
         CurrentStone = beginStone;
 
         // init
-        Board[3, 3] = Stone.Black;
-        Board[3, 4] = Stone.White;
-        Board[4, 3] = Stone.White;
-        Board[4, 4] = Stone.Black;
+        Board[3, 3] = Stone.White;
+        Board[3, 4] = Stone.Black;
+        Board[4, 3] = Stone.Black;
+        Board[4, 4] = Stone.White;
 
         Update();
     }
